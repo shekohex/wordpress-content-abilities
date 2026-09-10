@@ -11,9 +11,12 @@ declare( strict_types=1 );
 namespace ContentAbilities\Tests;
 
 use ContentAbilities\Abilities\CreatePostAbility;
+use ContentAbilities\Abilities\CreateTermAbility;
 use ContentAbilities\Abilities\FindPostsAbility;
 use ContentAbilities\Abilities\GetPostAbility;
+use ContentAbilities\Abilities\PatchPostAbility;
 use ContentAbilities\Abilities\UpdatePostAbility;
+use ContentAbilities\Abilities\UpdateTermAbility;
 use ContentAbilities\Container;
 use ContentAbilities\Plugin;
 use PHPUnit\Framework\TestCase;
@@ -169,6 +172,44 @@ final class AbilityIntegrationTest extends TestCase {
 		$denied = $ability->checkPermissions( array( 'id' => $id ) );
 		self::assertTrue( is_wp_error( $denied ) );
 		self::assertSame( 'content_forbidden', $denied->get_error_code() );
+	}
+
+	public function testPatchPostAbilityPermissionRequiresEditPost(): void {
+		WP_Test_Fixtures::$user_caps = array( 'read' => true );
+		$id = wp_insert_post(
+			array(
+				'post_type'    => 'post',
+				'post_title'   => 'Foreign',
+				'post_content' => 'x',
+				'post_status'  => 'publish',
+				'post_author'  => 42,
+			)
+		);
+
+		/** @var PatchPostAbility $ability */
+		$ability = $this->container->make( PatchPostAbility::class );
+		$denied  = $ability->checkPermissions( array( 'id' => $id ) );
+
+		self::assertTrue( is_wp_error( $denied ) );
+		self::assertSame( 'content_forbidden', $denied->get_error_code() );
+	}
+
+	public function testCreateTermPermissionRejectsInvalidTaxonomy(): void {
+		$ability = $this->container->make( CreateTermAbility::class );
+
+		$result = $ability->checkPermissions( array( 'taxonomy' => 'not-a-taxonomy' ) );
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_invalid_taxonomy', $result->get_error_code() );
+	}
+
+	public function testUpdateTermPermissionRejectsInvalidTaxonomy(): void {
+		$ability = $this->container->make( UpdateTermAbility::class );
+
+		$result = $ability->checkPermissions( array( 'taxonomy' => 'not-a-taxonomy' ) );
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_invalid_taxonomy', $result->get_error_code() );
 	}
 
 	public function testAbilitySchemasAreValidJsonSchemaObjects(): void {

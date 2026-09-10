@@ -91,4 +91,38 @@ abstract class AbstractAbility {
 			'required'   => array( 'id', 'type', 'title', 'status', 'slug', 'link' ),
 		);
 	}
+
+	/**
+	 * Builds the shared taxonomy selector schema.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function taxonomySchema(): array {
+		return array(
+			'type'        => 'string',
+			'enum'        => array( 'category', 'post_tag' ),
+			'description' => 'WordPress taxonomy: category or post_tag.',
+		);
+	}
+
+	/**
+	 * Builds the shared term output schema.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function termSchema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'id'          => array( 'type' => 'integer', 'description' => 'Term ID.' ),
+				'taxonomy'    => $this->taxonomySchema(),
+				'name'        => array( 'type' => 'string', 'description' => 'Term name.' ),
+				'slug'        => array( 'type' => 'string', 'description' => 'Term slug.' ),
+				'description' => array( 'type' => 'string', 'description' => 'Term description.' ),
+				'parent'      => array( 'type' => 'integer', 'description' => 'Parent term ID for categories; zero otherwise.' ),
+				'count'       => array( 'type' => 'integer', 'description' => 'Assigned object count.' ),
+			),
+			'required'   => array( 'id', 'taxonomy', 'name', 'slug', 'description', 'parent', 'count' ),
+		);
+	}
 }

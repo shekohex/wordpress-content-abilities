@@ -52,13 +52,23 @@ final class CreatePostAbility extends AbstractAbility implements AbilityContract
 					),
 					'categories' => array(
 						'type'        => 'array',
-						'items'       => array( 'type' => 'string' ),
-						'description' => 'Category names to assign (created if missing).',
+						'items'       => array(
+							'oneOf' => array(
+								array( 'type' => 'integer', 'minimum' => 1 ),
+								array( 'type' => 'string', 'minLength' => 1 ),
+							),
+						),
+						'description' => 'Category IDs or names to assign. Names are created if missing.',
 					),
 					'tags'       => array(
 						'type'        => 'array',
-						'items'       => array( 'type' => 'string' ),
-						'description' => 'Tag names to assign (created if missing).',
+						'items'       => array(
+							'oneOf' => array(
+								array( 'type' => 'integer', 'minimum' => 1 ),
+								array( 'type' => 'string', 'minLength' => 1 ),
+							),
+						),
+						'description' => 'Tag IDs or names to assign. Names are created if missing.',
 					),
 				),
 			),

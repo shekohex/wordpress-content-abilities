@@ -67,6 +67,11 @@ if ( ! class_exists( 'WP_Post' ) ) {
 	class WP_Post extends stdClass {}
 }
 
+if ( ! class_exists( 'WP_Term' ) ) {
+	/** Minimal WP_Term test double. */
+	class WP_Term extends stdClass {}
+}
+
 if ( ! function_exists( 'is_wp_error' ) ) {
 	/**
 	 * Emulated is_wp_error().
@@ -86,7 +91,7 @@ final class WP_Test_Fixtures {
 	/** @var array<int, array<string, array<int, string>>> Post ID => taxonomy => term names. */
 	public static array $post_terms = array();
 
-	/** @var array<string, array<string, array{term_id:int,name:string,slug:string}>> Taxonomy => slug => term. */
+	/** @var array<string, array<string, WP_Term>> Taxonomy => slug => term. */
 	public static array $terms = array();
 
 	public static int $next_post_id = 1;
@@ -230,6 +235,36 @@ if ( ! function_exists( 'wp_kses_post' ) ) {
 		// Rough emulation: strip <script> and on* attributes.
 		$content = preg_replace( '#<script\b[^>]*>.*?</script>#is', '', $content ) ?? $content;
 		return preg_replace( '/\son\w+="[^"]*"/i', '', $content ) ?? $content;
+	}
+}
+
+if ( ! function_exists( 'wp_slash' ) ) {
+	function wp_slash( mixed $value ): mixed {
+		if ( is_array( $value ) ) {
+			return array_map( 'wp_slash', $value );
+		}
+		if ( is_string( $value ) ) {
+			return addslashes( $value );
+		}
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'wp_unslash' ) ) {
+	function wp_unslash( mixed $value ): mixed {
+		if ( is_array( $value ) ) {
+			return array_map( 'wp_unslash', $value );
+		}
+		if ( is_string( $value ) ) {
+			return stripslashes( $value );
+		}
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( string $title ): string {
+		return trim( preg_replace( '/[^a-z0-9]+/', '-', strtolower( $title ) ) ?? '', '-' );
 	}
 }
 
@@ -413,6 +448,7 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
 	 * @return int|WP_Error
 	 */
 	function wp_insert_post( array $postarr ) {
+		$postarr = wp_unslash( $postarr );
 		$type = $postarr['post_type'] ?? 'post';
 		if ( ! post_type_exists( $type ) ) {
 			return new WP_Error( 'invalid_post_type', 'Invalid post type.' );
@@ -458,6 +494,7 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 	 * @return int|WP_Error
 	 */
 	function wp_update_post( array $postarr ) {
+		$postarr = wp_unslash( $postarr );
 		$id = (int) ( $postarr['ID'] ?? 0 );
 		if ( ! isset( WP_Test_Fixtures::$posts[ $id ] ) ) {
 			return new WP_Error( 'invalid_post_id', 'Invalid post ID.' );
@@ -550,32 +587,150 @@ if ( ! function_exists( 'get_post_status' ) ) {
  * Taxonomies / terms.
  * ---------------------------------------------------------------------- */
 
+$GLOBALS['__wp_test_taxonomies'] = array(
+	'category' => (object) array(
+		'name'         => 'category',
+		'public'       => true,
+		'hierarchical' => true,
+		'cap'          => (object) array(
+			'manage_terms' => 'manage_categories',
+			'edit_terms'   => 'manage_categories',
+			'delete_terms' => 'delete_categories',
+			'assign_terms' => 'edit_posts',
+		),
+	),
+	'post_tag' => (object) array(
+		'name'         => 'post_tag',
+		'public'       => true,
+		'hierarchical' => false,
+		'cap'          => (object) array(
+			'manage_terms' => 'manage_post_tags',
+			'edit_terms'   => 'manage_post_tags',
+			'delete_terms' => 'delete_post_tags',
+			'assign_terms' => 'edit_posts',
+		),
+	),
+);
+
 if ( ! function_exists( 'taxonomy_exists' ) ) {
 	function taxonomy_exists( string $taxonomy ): bool {
-		return in_array( $taxonomy, array( 'category', 'post_tag' ), true );
+		return isset( $GLOBALS['__wp_test_taxonomies'][ $taxonomy ] );
+	}
+}
+
+if ( ! function_exists( 'get_taxonomy' ) ) {
+	function get_taxonomy( string $taxonomy ): object|false {
+		return $GLOBALS['__wp_test_taxonomies'][ $taxonomy ] ?? false;
 	}
 }
 
 if ( ! function_exists( 'wp_insert_term' ) ) {
-	function wp_insert_term( string $name, string $taxonomy ): stdClass|WP_Error {
-		$slug = trim( preg_replace( '/[^a-z0-9]+/', '-', strtolower( $name ) ) ?? '', '-' );
+	/**
+	 * @param array<string, mixed> $args
+	 */
+	function wp_insert_term( string $name, string $taxonomy, array $args = array() ): WP_Term|WP_Error {
+		$name = (string) wp_unslash( $name );
+		$args = wp_unslash( $args );
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return new WP_Error( 'invalid_taxonomy', 'Invalid taxonomy.' );
+		}
+		$slug = isset( $args['slug'] ) ? sanitize_title( (string) $args['slug'] ) : sanitize_title( $name );
 		foreach ( WP_Test_Fixtures::$terms[ $taxonomy ] ?? array() as $term ) {
 			if ( $term->slug === $slug ) {
 				return new WP_Error( 'term_exists', 'Term already exists.' );
 			}
 		}
-		$term = (object) array(
-			'term_id' => WP_Test_Fixtures::$next_term_id++,
-			'name'    => $name,
-			'slug'    => $slug,
-		);
+		$term              = new WP_Term();
+		$term->term_id     = WP_Test_Fixtures::$next_term_id++;
+		$term->taxonomy    = $taxonomy;
+		$term->name        = $name;
+		$term->slug        = $slug;
+		$term->description = (string) ( $args['description'] ?? '' );
+		$term->parent      = (int) ( $args['parent'] ?? 0 );
+		$term->count       = 0;
 		WP_Test_Fixtures::$terms[ $taxonomy ][ $slug ] = $term;
 		return $term;
 	}
 }
 
+if ( ! function_exists( 'wp_update_term' ) ) {
+	/**
+	 * @param array<string, mixed> $args
+	 */
+	function wp_update_term( int $term_id, string $taxonomy, array $args = array() ): WP_Term|WP_Error {
+		$args = wp_unslash( $args );
+		$term = get_term( $term_id, $taxonomy );
+		if ( is_wp_error( $term ) ) {
+			return $term;
+		}
+		if ( null === $term ) {
+			return new WP_Error( 'invalid_term', 'Term does not exist.' );
+		}
+
+		$old_slug = $term->slug;
+		if ( array_key_exists( 'name', $args ) ) {
+			$term->name = (string) $args['name'];
+		}
+		if ( array_key_exists( 'slug', $args ) ) {
+			$term->slug = sanitize_title( (string) $args['slug'] );
+		}
+		if ( array_key_exists( 'description', $args ) ) {
+			$term->description = (string) $args['description'];
+		}
+		if ( array_key_exists( 'parent', $args ) ) {
+			$term->parent = (int) $args['parent'];
+		}
+
+		unset( WP_Test_Fixtures::$terms[ $taxonomy ][ $old_slug ] );
+		WP_Test_Fixtures::$terms[ $taxonomy ][ $term->slug ] = $term;
+		return $term;
+	}
+}
+
+if ( ! function_exists( 'get_term' ) ) {
+	function get_term( int $term_id, string $taxonomy ): WP_Term|WP_Error|null {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return new WP_Error( 'invalid_taxonomy', 'Invalid taxonomy.' );
+		}
+		foreach ( WP_Test_Fixtures::$terms[ $taxonomy ] as $term ) {
+			if ( (int) $term->term_id === $term_id ) {
+				return clone $term;
+			}
+		}
+		return null;
+	}
+}
+
+if ( ! function_exists( 'get_terms' ) ) {
+	/**
+	 * @param array<string, mixed> $args
+	 * @return WP_Term[]|WP_Error
+	 */
+	function get_terms( array $args ): array|WP_Error {
+		$taxonomy = (string) ( $args['taxonomy'] ?? '' );
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return new WP_Error( 'invalid_taxonomy', 'Invalid taxonomy.' );
+		}
+		$search = strtolower( (string) ( $args['search'] ?? '' ) );
+		$terms  = array_values( WP_Test_Fixtures::$terms[ $taxonomy ] );
+		if ( '' !== $search ) {
+			$terms = array_values(
+				array_filter(
+					$terms,
+					static fn( WP_Term $term ): bool => str_contains( strtolower( $term->name ), $search )
+				)
+			);
+		}
+		usort( $terms, static fn( WP_Term $a, WP_Term $b ): int => strcasecmp( $a->name, $b->name ) );
+		$offset = (int) ( $args['offset'] ?? 0 );
+		$number = (int) ( $args['number'] ?? 0 );
+		$slice  = $number > 0 ? array_slice( $terms, $offset, $number ) : array_slice( $terms, $offset );
+		return array_map( static fn( WP_Term $term ): WP_Term => clone $term, $slice );
+	}
+}
+
 if ( ! function_exists( 'get_term_by' ) ) {
-	function get_term_by( string $field, string|int $value, string $taxonomy ): ?object {
+	function get_term_by( string $field, string|int $value, string $taxonomy ): object|false {
 		$terms = WP_Test_Fixtures::$terms[ $taxonomy ] ?? array();
 		foreach ( $terms as $term ) {
 			if ( 'slug' === $field && $term->slug === (string) $value ) {
@@ -585,10 +740,10 @@ if ( ! function_exists( 'get_term_by' ) ) {
 				return $term;
 			}
 			if ( 'id' === $field && (int) $term->term_id === (int) $value ) {
-				return $term;
+				return clone $term;
 			}
 		}
-		return null;
+		return false;
 	}
 }
 
@@ -603,13 +758,16 @@ if ( ! function_exists( 'wp_set_post_terms' ) ) {
 		if ( is_string( $terms ) ) {
 			$terms = ( '' === $terms ) ? array() : array( $terms );
 		}
+		if ( ( get_taxonomy( $taxonomy )->hierarchical ?? false ) ) {
+			$terms = array_values( array_unique( array_map( 'intval', $terms ) ) );
+		}
 
 		$names = array();
 		foreach ( $terms as $term ) {
 			if ( is_int( $term ) ) {
 				$found = get_term_by( 'id', $term, $taxonomy );
-				if ( null === $found ) {
-					return new WP_Error( 'invalid_term', 'Term does not exist.' );
+				if ( false === $found ) {
+					continue;
 				}
 				$names[] = $found->name;
 				continue;
@@ -619,7 +777,7 @@ if ( ! function_exists( 'wp_set_post_terms' ) ) {
 				continue;
 			}
 			$existing = get_term_by( 'name', $name, $taxonomy );
-			if ( null === $existing ) {
+			if ( false === $existing ) {
 				$created = wp_insert_term( $name, $taxonomy );
 				if ( is_wp_error( $created ) ) {
 					return $created;
@@ -653,7 +811,7 @@ if ( ! function_exists( 'wp_get_post_terms' ) ) {
 		$out   = array();
 		foreach ( $names as $name ) {
 			$term = get_term_by( 'name', $name, $taxonomy );
-			if ( null !== $term ) {
+			if ( false !== $term ) {
 				$out[] = clone $term;
 			}
 		}

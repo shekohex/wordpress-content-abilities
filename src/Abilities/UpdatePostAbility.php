@@ -51,13 +51,23 @@ final class UpdatePostAbility extends AbstractAbility implements AbilityContract
 					),
 					'categories' => array(
 						'type'        => 'array',
-						'items'       => array( 'type' => 'string' ),
-						'description' => 'Replacement category names.',
+						'items'       => array(
+							'oneOf' => array(
+								array( 'type' => 'integer', 'minimum' => 1 ),
+								array( 'type' => 'string', 'minLength' => 1 ),
+							),
+						),
+						'description' => 'Replacement category IDs or names.',
 					),
 					'tags'       => array(
 						'type'        => 'array',
-						'items'       => array( 'type' => 'string' ),
-						'description' => 'Replacement tag names.',
+						'items'       => array(
+							'oneOf' => array(
+								array( 'type' => 'integer', 'minimum' => 1 ),
+								array( 'type' => 'string', 'minLength' => 1 ),
+							),
+						),
+						'description' => 'Replacement tag IDs or names.',
 					),
 				),
 				'required'   => array( 'id' ),

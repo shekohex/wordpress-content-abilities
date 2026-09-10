@@ -71,4 +71,28 @@ final class CapabilityGuard {
 
 		return current_user_can( $cap );
 	}
+
+	/**
+	 * Whether the current user can create or edit terms in a taxonomy.
+	 */
+	public function canEditTerms( string $taxonomy ): bool {
+		$taxonomyObject = get_taxonomy( $taxonomy );
+		if ( false === $taxonomyObject || ! isset( $taxonomyObject->cap->edit_terms ) ) {
+			return false;
+		}
+
+		return current_user_can( (string) $taxonomyObject->cap->edit_terms );
+	}
+
+	/**
+	 * Whether the current user can assign terms from a taxonomy.
+	 */
+	public function canAssignTerms( string $taxonomy ): bool {
+		$taxonomyObject = get_taxonomy( $taxonomy );
+		if ( false === $taxonomyObject || ! isset( $taxonomyObject->cap->assign_terms ) ) {
+			return false;
+		}
+
+		return current_user_can( (string) $taxonomyObject->cap->assign_terms );
+	}
 }

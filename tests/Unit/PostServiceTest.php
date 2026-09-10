@@ -40,6 +40,8 @@ final class PostServiceTest extends TestCase {
 			'edit_others_pages'   => true,
 			'publish_pages'       => true,
 			'read_private_posts'  => true,
+			'manage_categories'   => true,
+			'manage_post_tags'    => true,
 		);
 	}
 
@@ -152,7 +154,11 @@ final class PostServiceTest extends TestCase {
 	public function testGetPostReturnsFullPostWithTerms(): void {
 		$this->grantEditor();
 		$id = $this->makePost( 'Rich Post' );
-		wp_set_post_terms( $id, array( 'News', 'Tech' ), 'category' );
+		$news = wp_insert_term( 'News', 'category' );
+		$tech = wp_insert_term( 'Tech', 'category' );
+		self::assertNotInstanceOf( \WP_Error::class, $news );
+		self::assertNotInstanceOf( \WP_Error::class, $tech );
+		wp_set_post_terms( $id, array( (int) $news->term_id, (int) $tech->term_id ), 'category' );
 		wp_set_post_terms( $id, array( 'ai' ), 'post_tag' );
 
 		$result = $this->service->getPost( $id );
@@ -292,6 +298,148 @@ final class PostServiceTest extends TestCase {
 		self::assertSame( array( 'ai', 'wordpress' ), $result['tags'] );
 	}
 
+	public function testCreatePostAssignsTermsByUnambiguousIdsAndNames(): void {
+		$this->grantEditor();
+		$news = wp_insert_term( 'News', 'category' );
+		self::assertNotInstanceOf( \WP_Error::class, $news );
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Mixed term references',
+				'categories' => array( (int) $news->term_id, 'Tech' ),
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( array( 'News', 'Tech' ), $result['categories'] );
+	}
+
+	public function testCreatePostResolvesNumericCategoryNamesBeforeCoreCoercion(): void {
+		$this->grantEditor();
+		$term = wp_insert_term( '12', 'category' );
+		self::assertNotInstanceOf( \WP_Error::class, $term );
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Numeric category name',
+				'categories' => array( '12' ),
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( array( '12' ), $result['categories'] );
+	}
+
+	public function testCreatePostKeepsNumericCategoryIdDistinctFromNumericCategoryName(): void {
+		$this->grantEditor();
+		WP_Test_Fixtures::$next_term_id = 12;
+		$idTerm = wp_insert_term( 'ID twelve', 'category' );
+		$nameTerm = wp_insert_term( '12', 'category' );
+		self::assertNotInstanceOf( \WP_Error::class, $idTerm );
+		self::assertNotInstanceOf( \WP_Error::class, $nameTerm );
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Distinct numeric term references',
+				'categories' => array( 12, '12' ),
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( array( 'ID twelve', '12' ), $result['categories'] );
+	}
+
+	public function testCreatePostPropagatesTermAssignmentErrors(): void {
+		$this->grantEditor();
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Invalid term reference',
+				'categories' => array( 999 ),
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'invalid_term', $result->get_error_code() );
+		self::assertCount( 0, WP_Test_Fixtures::$posts );
+	}
+
+	public function testCreatePostDoesNotPersistBeforeFailedTermCreation(): void {
+		$this->grantEditor();
+		wp_insert_term( 'Foo/Bar', 'category' );
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Failed term creation',
+				'categories' => array( 'Foo Bar' ),
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'term_exists', $result->get_error_code() );
+		self::assertCount( 0, WP_Test_Fixtures::$posts );
+	}
+
+	public function testCreatePostRejectsIdFromAnotherTaxonomy(): void {
+		$this->grantEditor();
+		$tag = wp_insert_term( 'Only a tag', 'post_tag' );
+		self::assertNotInstanceOf( \WP_Error::class, $tag );
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Wrong taxonomy ID',
+				'categories' => array( (int) $tag->term_id ),
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'invalid_term', $result->get_error_code() );
+	}
+
+	public function testCreatePostCannotCreateMissingTermWithoutTaxonomyEditCapability(): void {
+		$this->grantAuthor();
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Unauthorized term creation',
+				'categories' => array( 'New category' ),
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_forbidden', $result->get_error_code() );
+	}
+
+	public function testCreatePostCanAssignExistingTermWithAssignCapability(): void {
+		$this->grantAuthor();
+		wp_insert_term( 'Existing category', 'category' );
+
+		$result = $this->service->createPost(
+			array(
+				'title'      => 'Authorized assignment',
+				'categories' => array( 'Existing category' ),
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( array( 'Existing category' ), $result['categories'] );
+	}
+
+	public function testCreatePostPreservesLiteralBackslashesInCodeLatexAndWindowsPath(): void {
+		$this->grantEditor();
+		$content = 'Code: \\n; LaTeX: \\frac{a}{b}; Windows: C:\\Program Files\\WordPress';
+
+		$result = $this->service->createPost(
+			array(
+				'title'   => 'Backslashes on create',
+				'content' => $content,
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( $content, $result['content'] );
+	}
+
 	/* -----------------------------------------------------------------
 	 * updatePost.
 	 * ------------------------------------------------------------------ */
@@ -379,7 +527,9 @@ final class PostServiceTest extends TestCase {
 	public function testUpdatePostReplacesCategories(): void {
 		$this->grantEditor();
 		$id = $this->makePost( 'Cat Post' );
-		wp_set_post_terms( $id, array( 'Old' ), 'category' );
+		$old = wp_insert_term( 'Old', 'category' );
+		self::assertNotInstanceOf( \WP_Error::class, $old );
+		wp_set_post_terms( $id, array( (int) $old->term_id ), 'category' );
 
 		$result = $this->service->updatePost(
 			array( 'id' => $id, 'categories' => array( 'New' ) )
@@ -399,5 +549,235 @@ final class PostServiceTest extends TestCase {
 
 		self::assertIsArray( $result );
 		self::assertSame( '<p>ok</p><p>t</p>', $result['content'] );
+	}
+
+	public function testUpdatePostPreservesLiteralBackslashesInCodeLatexAndWindowsPath(): void {
+		$this->grantEditor();
+		$id      = $this->makePost( 'Backslash target' );
+		$content = 'Code: \\n; LaTeX: \\frac{a}{b}; Windows: C:\\Program Files\\WordPress';
+
+		$result = $this->service->updatePost(
+			array(
+				'id'      => $id,
+				'content' => $content,
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( $content, $result['content'] );
+	}
+
+	public function testUpdatePostPropagatesTermAssignmentErrors(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'Invalid assignment' );
+
+		$result = $this->service->updatePost(
+			array(
+				'id'    => $id,
+				'title' => 'Must not change',
+				'tags'  => array( 999 ),
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'invalid_term', $result->get_error_code() );
+		self::assertSame( 'Invalid assignment', WP_Test_Fixtures::$posts[ $id ]->post_title );
+	}
+
+	public function testUpdatePostDoesNotPersistBeforeFailedTermCreation(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'Failed term update' );
+		wp_insert_term( 'Foo/Bar', 'category' );
+
+		$result = $this->service->updatePost(
+			array(
+				'id'         => $id,
+				'title'      => 'Must not change',
+				'categories' => array( 'Foo Bar' ),
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'term_exists', $result->get_error_code() );
+		self::assertSame( 'Failed term update', WP_Test_Fixtures::$posts[ $id ]->post_title );
+	}
+
+	/* -----------------------------------------------------------------
+	 * patchPost.
+	 * ------------------------------------------------------------------ */
+
+	public function testPatchPostReplacesOneExactMatchAndPreservesFormatting(): void {
+		$this->grantEditor();
+		$id = wp_insert_post(
+			array(
+				'post_title'   => 'Patch target',
+				'post_content' => '<!-- wp:paragraph --><p>Hello <strong>world</strong>.</p><!-- /wp:paragraph -->',
+				'post_status'  => 'draft',
+				'post_author'  => 7,
+			)
+		);
+		self::assertIsInt( $id );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'content',
+				'old_text' => '<strong>world</strong>',
+				'new_text' => '<em>WordPress</em>',
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( 1, $result['replacement_count'] );
+		self::assertSame(
+			'<!-- wp:paragraph --><p>Hello <em>WordPress</em>.</p><!-- /wp:paragraph -->',
+			$result['post']['content']
+		);
+	}
+
+	public function testPatchPostRejectsAmbiguousMatchByDefault(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'repeat repeat' );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'title',
+				'old_text' => 'repeat',
+				'new_text' => 'once',
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_patch_ambiguous', $result->get_error_code() );
+	}
+
+	public function testPatchPostCanReplaceAllExactMatches(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'repeat repeat' );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'          => $id,
+				'field'       => 'title',
+				'old_text'    => 'repeat',
+				'new_text'    => 'fixed',
+				'replace_all' => true,
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( 2, $result['replacement_count'] );
+		self::assertSame( 'fixed fixed', $result['post']['title'] );
+	}
+
+	public function testPatchPostRejectsMissingText(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'Patch target' );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'excerpt',
+				'old_text' => 'missing',
+				'new_text' => 'replacement',
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_patch_text_not_found', $result->get_error_code() );
+	}
+
+	public function testPatchPostRejectsStaleExpectedModifiedGmt(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'Patch target' );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'                    => $id,
+				'field'                 => 'title',
+				'old_text'              => 'target',
+				'new_text'              => 'result',
+				'expected_modified_gmt' => '2000-01-01 00:00:00',
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_post_modified', $result->get_error_code() );
+	}
+
+	public function testPatchPostSanitizesReplacementOutput(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'Patch target' );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'content',
+				'old_text' => 'Content',
+				'new_text' => '<script>evil()</script><strong>Safe</strong>',
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( '<strong>Safe</strong> of Patch target', $result['post']['content'] );
+	}
+
+	public function testPatchPostPreservesLiteralBackslashesInCodeLatexAndWindowsPath(): void {
+		$this->grantEditor();
+		$id      = $this->makePost( 'Patch backslashes' );
+		$content = 'Code: \\n; LaTeX: \\frac{a}{b}; Windows: C:\\Program Files\\WordPress';
+		wp_update_post(
+			array(
+				'ID'           => $id,
+				'post_content' => 'Before content',
+			)
+		);
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'content',
+				'old_text' => 'Before content',
+				'new_text' => $content,
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( $content, $result['post']['content'] );
+	}
+
+	public function testPatchPostPreservesUntouchedTitleWhitespace(): void {
+		$this->grantEditor();
+		$id = $this->makePost( 'Hello  world' );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'title',
+				'old_text' => 'world',
+				'new_text' => '<b>WordPress</b>',
+			)
+		);
+
+		self::assertIsArray( $result );
+		self::assertSame( 'Hello  WordPress', $result['post']['title'] );
+	}
+
+	public function testPatchPostRequiresEditPostPermission(): void {
+		$this->grantSubscriber();
+		$id = $this->makePost( 'Patch target', 'publish', 'post', 42 );
+
+		$result = $this->service->patchPost(
+			array(
+				'id'       => $id,
+				'field'    => 'title',
+				'old_text' => 'target',
+				'new_text' => 'result',
+			)
+		);
+
+		self::assertTrue( is_wp_error( $result ) );
+		self::assertSame( 'content_forbidden', $result->get_error_code() );
 	}
 }

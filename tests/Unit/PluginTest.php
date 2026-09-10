@@ -33,7 +33,7 @@ final class PluginTest extends TestCase {
 		$this->assertNotSame( '', (string) $category['description'] );
 	}
 
-	public function testRegistersExactlyFourAbilitiesInTheContentNamespace(): void {
+	public function testRegistersAllAbilitiesInTheContentNamespace(): void {
 		$this->plugin->registerCategory();
 		$this->plugin->registerAbilities();
 
@@ -43,6 +43,11 @@ final class PluginTest extends TestCase {
 				'content/get-post',
 				'content/create-post',
 				'content/update-post',
+				'content/patch-post',
+				'content/find-terms',
+				'content/get-term',
+				'content/create-term',
+				'content/update-term',
 			),
 			array_keys( WP_Test_Fixtures::$abilities )
 		);
@@ -72,6 +77,11 @@ final class PluginTest extends TestCase {
 			'content/get-post'   => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
 			'content/create-post' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
 			'content/update-post' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => true ),
+			'content/patch-post'  => array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
+			'content/find-terms'  => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
+			'content/get-term'    => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
+			'content/create-term' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
+			'content/update-term' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => true ),
 		);
 
 		foreach ( $expected as $name => $annotations ) {

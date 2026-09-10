@@ -13,8 +13,11 @@ use ContentAbilities\Abilities\FindPostsAbility;
 use ContentAbilities\Abilities\GetPostAbility;
 use ContentAbilities\Abilities\CreatePostAbility;
 use ContentAbilities\Abilities\UpdatePostAbility;
-use ContentAbilities\Repositories\PostRepository;
-use ContentAbilities\Services\PostService;
+use ContentAbilities\Abilities\PatchPostAbility;
+use ContentAbilities\Abilities\FindTermsAbility;
+use ContentAbilities\Abilities\GetTermAbility;
+use ContentAbilities\Abilities\CreateTermAbility;
+use ContentAbilities\Abilities\UpdateTermAbility;
 
 /**
  * Plugin bootstrap orchestrator.
@@ -26,7 +29,7 @@ final class Plugin {
 
 	public const CATEGORY_SLUG = 'content';
 
-	public const VERSION = '1.0.0';
+	public const VERSION = '1.1.0';
 
 	/**
 	 * Registers the ability category (wp_abilities_api_categories_init).
@@ -36,7 +39,7 @@ final class Plugin {
 			self::CATEGORY_SLUG,
 			array(
 				'label'       => __( 'Content', 'content-abilities' ),
-				'description' => __( 'Abilities for finding, reading, creating, and updating WordPress content.', 'content-abilities' ),
+				'description' => __( 'Abilities for finding, reading, creating, patching, and updating WordPress posts, categories, and tags.', 'content-abilities' ),
 			)
 		);
 	}
@@ -50,5 +53,10 @@ final class Plugin {
 		wp_register_ability( 'content/get-post', $container->make( GetPostAbility::class )->definition() );
 		wp_register_ability( 'content/create-post', $container->make( CreatePostAbility::class )->definition() );
 		wp_register_ability( 'content/update-post', $container->make( UpdatePostAbility::class )->definition() );
+		wp_register_ability( 'content/patch-post', $container->make( PatchPostAbility::class )->definition() );
+		wp_register_ability( 'content/find-terms', $container->make( FindTermsAbility::class )->definition() );
+		wp_register_ability( 'content/get-term', $container->make( GetTermAbility::class )->definition() );
+		wp_register_ability( 'content/create-term', $container->make( CreateTermAbility::class )->definition() );
+		wp_register_ability( 'content/update-term', $container->make( UpdateTermAbility::class )->definition() );
 	}
 }

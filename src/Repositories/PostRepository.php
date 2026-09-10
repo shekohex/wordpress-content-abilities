@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace ContentAbilities\Repositories;
 
 use WP_Error;
+use WP_Term;
 
 /**
  * Data-access boundary for posts.
@@ -84,7 +85,7 @@ final class PostRepository {
 	/**
 	 * Sets taxonomy terms on a post.
 	 *
-	 * @param string[] $terms
+	 * @param array<int> $terms
 	 * @return string[]|WP_Error
 	 */
 	public function setTerms( int $postId, array $terms, string $taxonomy ): array|WP_Error {
@@ -99,6 +100,42 @@ final class PostRepository {
 	}
 
 	/**
+	 * Finds a term ID in a taxonomy.
+	 */
+	public function findTermId( int $id, string $taxonomy ): int|WP_Error|null {
+		$term = get_term( $id, $taxonomy );
+		if ( is_wp_error( $term ) ) {
+			return $term;
+		}
+		return $term instanceof WP_Term ? (int) $term->term_id : null;
+	}
+
+	/**
+	 * Finds a term ID by exact name in a taxonomy.
+	 */
+	public function findTermIdByName( string $name, string $taxonomy ): int|WP_Error|null {
+		$term = get_term_by( 'name', $name, $taxonomy );
+		if ( false === $term ) {
+			return null;
+		}
+		if ( ! $term instanceof WP_Term ) {
+			return new WP_Error( 'content_terms_failed', 'Unable to resolve term.' );
+		}
+		return (int) $term->term_id;
+	}
+
+	/**
+	 * Creates a term and returns its ID.
+	 */
+	public function insertTerm( string $name, string $taxonomy ): int|WP_Error {
+		$result = wp_insert_term( (string) wp_slash( $name ), $taxonomy );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return $result instanceof WP_Term ? (int) $result->term_id : (int) $result['term_id'];
+	}
+
+	/**
 	 * Lists term names attached to a post.
 	 *
 	 * @return string[]
@@ -109,5 +146,12 @@ final class PostRepository {
 			return array();
 		}
 		return array_map( static fn( $t ) => (string) $t->name, $terms );
+	}
+
+	/**
+	 * Checks whether an exact term name exists in a taxonomy.
+	 */
+	public function termExistsByName( string $name, string $taxonomy ): bool {
+		return is_int( $this->findTermIdByName( $name, $taxonomy ) );
 	}
 }
