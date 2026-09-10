@@ -18,6 +18,12 @@ use ContentAbilities\Abilities\FindTermsAbility;
 use ContentAbilities\Abilities\GetTermAbility;
 use ContentAbilities\Abilities\CreateTermAbility;
 use ContentAbilities\Abilities\UpdateTermAbility;
+use ContentAbilities\Abilities\FindMediaAbility;
+use ContentAbilities\Abilities\GetMediaAbility;
+use ContentAbilities\Abilities\ImportMediaAbility;
+use ContentAbilities\Abilities\UpdateMediaAbility;
+use ContentAbilities\Abilities\SetFeaturedImageAbility;
+use ContentAbilities\Abilities\InsertMediaAbility;
 
 /**
  * Plugin bootstrap orchestrator.
@@ -29,7 +35,7 @@ final class Plugin {
 
 	public const CATEGORY_SLUG = 'content';
 
-	public const VERSION = '1.1.1';
+	public const VERSION = '1.2.0';
 
 	/**
 	 * Registers the ability category (wp_abilities_api_categories_init).
@@ -39,7 +45,7 @@ final class Plugin {
 			self::CATEGORY_SLUG,
 			array(
 				'label'       => __( 'Content', 'content-abilities' ),
-				'description' => __( 'Abilities for finding, reading, creating, patching, and updating WordPress posts, categories, and tags.', 'content-abilities' ),
+				'description' => __( 'Abilities for finding, reading, creating, patching, and updating WordPress posts, taxonomies, and media.', 'content-abilities' ),
 			)
 		);
 	}
@@ -58,5 +64,11 @@ final class Plugin {
 		wp_register_ability( 'content/get-term', $container->make( GetTermAbility::class )->definition() );
 		wp_register_ability( 'content/create-term', $container->make( CreateTermAbility::class )->definition() );
 		wp_register_ability( 'content/update-term', $container->make( UpdateTermAbility::class )->definition() );
+		wp_register_ability( 'content/find-media', $container->make( FindMediaAbility::class )->definition() );
+		wp_register_ability( 'content/get-media', $container->make( GetMediaAbility::class )->definition() );
+		wp_register_ability( 'content/import-media', $container->make( ImportMediaAbility::class )->definition() );
+		wp_register_ability( 'content/update-media', $container->make( UpdateMediaAbility::class )->definition() );
+		wp_register_ability( 'content/set-featured-image', $container->make( SetFeaturedImageAbility::class )->definition() );
+		wp_register_ability( 'content/insert-media', $container->make( InsertMediaAbility::class )->definition() );
 	}
 }

@@ -1,6 +1,6 @@
 # Content Abilities
 
-Production-quality WordPress plugin that exposes post, category, and tag abilities through the [WordPress Abilities API](https://developer.wordpress.org/apis/abilities/) (WordPress 6.9+) and the official [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/), so AI agents and automation can work with site content safely.
+Production-quality WordPress plugin that exposes post, category, tag, and media abilities through the [WordPress Abilities API](https://developer.wordpress.org/apis/abilities/) (WordPress 6.9+) and the official [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/), so AI agents and automation can work with site content safely.
 
 * No delete ability — content cannot be destroyed through this plugin.
 * WordPress capability checks on every ability, including object-level `read_post` / `edit_post` / `publish_post`.
@@ -30,6 +30,12 @@ All abilities live in the `content` category (registered on `wp_abilities_api_ca
 | `content/get-term` | Fetch one category or tag | `readonly: true`, `idempotent: true` |
 | `content/create-term` | Create a category or tag | `readonly: false`, `idempotent: false` |
 | `content/update-term` | Update a category or tag | `readonly: false`, `idempotent: true` |
+| `content/find-media` | Search/list readable attachments with pagination and MIME filters | `readonly: true`, `idempotent: true` |
+| `content/get-media` | Fetch stable attachment metadata and generated image sizes | `readonly: true`, `idempotent: true` |
+| `content/import-media` | Securely sideload media from a public HTTPS URL | `readonly: false`, `idempotent: false` |
+| `content/update-media` | Update attachment title, alt text, caption, or description | `readonly: false`, `idempotent: true` |
+| `content/set-featured-image` | Set a readable image attachment as a post's featured image | `readonly: false`, `idempotent: true` |
+| `content/insert-media` | Insert a Gutenberg image block into post content | `readonly: false`, `idempotent: false` |
 
 ### Example inputs
 
@@ -105,6 +111,56 @@ Matching is exact and case-sensitive. With `replace_all: false`, zero matches re
 { "taxonomy": "post_tag", "id": 34, "name": "WordPress AI" }
 ```
 
+`content/find-media`
+
+```json
+{ "search": "launch", "mime_type": "image", "page": 1, "per_page": 20 }
+```
+
+`content/import-media`
+
+```json
+{
+  "source_url": "https://cdn.example.com/images/launch.jpg",
+  "title": "Launch photo",
+  "alt_text": "Team launching the product",
+  "caption": "Launch day",
+  "description": "Press image from launch day",
+  "attach_to_post_id": 42
+}
+```
+
+Imports accept only public HTTPS URLs. Downloads use WordPress safe HTTP validation across redirects, stream to a temporary file, time out after 15 seconds, and stop at a plugin-level 20 MiB maximum regardless of the site's upload limit. WordPress validates the downloaded file's allowed MIME type and extension before `media_handle_sideload()` runs. Base64 payloads and local file paths are not accepted. Temporary files are removed on success and every failure path.
+
+`content/update-media`
+
+```json
+{ "id": 77, "title": "Updated photo", "alt_text": "Updated alternative text" }
+```
+
+`content/set-featured-image`
+
+```json
+{ "post_id": 42, "media_id": 77 }
+```
+
+`content/insert-media`
+
+```json
+{
+  "post_id": 42,
+  "media_id": 77,
+  "expected_modified_gmt": "2026-04-01 10:30:00",
+  "placement": "after",
+  "anchor_text": "<!-- /wp:heading -->",
+  "size_slug": "large",
+  "caption": "Launch day",
+  "link_destination": "media"
+}
+```
+
+Insertion supports `append`, `prepend`, `before`, `after`, and `replace`. Anchored modes require one exact byte match; missing or repeated anchors fail without changing the post. Allowed image sizes are `thumbnail`, `medium`, `medium_large`, `large`, and `full`; link destinations are `none`, `media`, and `attachment`.
+
 ## Permissions
 
 Every ability enforces WordPress capabilities; failures return structured `WP_Error` values. Native WordPress errors from post, term, and assignment operations are propagated.
@@ -118,6 +174,11 @@ Every ability enforces WordPress capabilities; failures return structured `WP_Er
 | `content/patch-post` | Object-level `edit_post` |
 | `content/find-terms` / `content/get-term` | Public category/tag reads |
 | `content/create-term` / `content/update-term` | Selected taxonomy's `edit_terms` capability |
+| `content/find-media` / `content/get-media` | Object-level `read_post` for returned attachments |
+| `content/import-media` | `upload_files`; object-level `edit_post` when attaching to a parent |
+| `content/update-media` | Object-level `edit_post` on the attachment |
+| `content/set-featured-image` | Object-level `edit_post` on target post and `read_post` on image attachment |
+| `content/insert-media` | Object-level `edit_post` on target post and `read_post` on image attachment |
 
 Supplying categories or tags to post creation/update additionally requires the selected taxonomy's `assign_terms` capability.
 
@@ -185,8 +246,8 @@ src/
   Container.php                   Minimal auto-wiring DI container
   Contracts/AbilityContract.php   Ability interface
   Abilities/                      One final class per ability + shared base
-  Services/                       Post and term validation, caps, sanitization
-  Repositories/                   WordPress post and term data access
+  Services/                       Post, term, and media validation, caps, sanitization
+  Repositories/                   WordPress post, term, media, and HTTP data access
   Support/                        CapabilityGuard, PostTypes helpers
 tests/                            PHPUnit tests + WP stubs
 ```

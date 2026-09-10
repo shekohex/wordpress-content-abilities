@@ -129,4 +129,47 @@ abstract class AbstractAbility {
 			'required'   => array( 'id', 'taxonomy', 'name', 'slug', 'description', 'parent', 'count' ),
 		);
 	}
+
+	/**
+	 * Builds the shared attachment output schema.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function mediaSchema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'id'           => array( 'type' => 'integer', 'description' => 'Attachment ID.' ),
+				'title'        => array( 'type' => 'string', 'description' => 'Attachment title.' ),
+				'alt_text'     => array( 'type' => 'string', 'description' => 'Image alternative text.' ),
+				'caption'      => array( 'type' => 'string', 'description' => 'Attachment caption.' ),
+				'description'  => array( 'type' => 'string', 'description' => 'Attachment description.' ),
+				'mime_type'    => array( 'type' => 'string', 'description' => 'Attachment MIME type.' ),
+				'media_type'   => array( 'type' => 'string', 'description' => 'Top-level media family.' ),
+				'url'          => array( 'type' => 'string', 'format' => 'uri', 'description' => 'Original attachment URL.' ),
+				'width'        => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Original image width, or zero.' ),
+				'height'       => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Original image height, or zero.' ),
+				'filesize'     => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'File size in bytes, or zero.' ),
+				'parent_id'    => array( 'type' => 'integer', 'minimum' => 0, 'description' => 'Parent post ID, or zero.' ),
+				'date_gmt'     => array( 'type' => 'string', 'description' => 'Creation date in GMT.' ),
+				'modified_gmt' => array( 'type' => 'string', 'description' => 'Modification date in GMT.' ),
+				'sizes'        => array(
+					'type'                 => 'object',
+					'description'          => 'Generated image sizes keyed by size slug.',
+					'additionalProperties' => array(
+						'type'       => 'object',
+						'properties' => array(
+							'url'       => array( 'type' => 'string', 'format' => 'uri' ),
+							'width'     => array( 'type' => 'integer', 'minimum' => 0 ),
+							'height'    => array( 'type' => 'integer', 'minimum' => 0 ),
+							'mime_type' => array( 'type' => 'string' ),
+							'filesize'  => array( 'type' => 'integer', 'minimum' => 0 ),
+						),
+						'required'   => array( 'url', 'width', 'height', 'mime_type', 'filesize' ),
+					),
+				),
+			),
+			'required'   => array( 'id', 'title', 'alt_text', 'caption', 'description', 'mime_type', 'media_type', 'url', 'width', 'height', 'filesize', 'parent_id', 'date_gmt', 'modified_gmt', 'sizes' ),
+		);
+	}
 }

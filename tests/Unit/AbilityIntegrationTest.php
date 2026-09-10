@@ -14,6 +14,7 @@ use ContentAbilities\Abilities\CreatePostAbility;
 use ContentAbilities\Abilities\CreateTermAbility;
 use ContentAbilities\Abilities\FindPostsAbility;
 use ContentAbilities\Abilities\GetPostAbility;
+use ContentAbilities\Abilities\ImportMediaAbility;
 use ContentAbilities\Abilities\PatchPostAbility;
 use ContentAbilities\Abilities\UpdatePostAbility;
 use ContentAbilities\Abilities\UpdateTermAbility;
@@ -48,6 +49,7 @@ final class AbilityIntegrationTest extends TestCase {
 		$ability = $this->container->make( CreatePostAbility::class );
 
 		self::assertInstanceOf( CreatePostAbility::class, $ability );
+		self::assertInstanceOf( ImportMediaAbility::class, $this->container->make( ImportMediaAbility::class ) );
 	}
 
 	public function testRegisteredDefinitionsPointAtCallableCallbacks(): void {
@@ -233,5 +235,37 @@ final class AbilityIntegrationTest extends TestCase {
 				self::assertArrayHasKey( 'properties', $schema, "$name $key must declare properties" );
 			}
 		}
+	}
+
+	public function testMediaAbilitiesExposeStrictMcpPublicMetadataAndSchemas(): void {
+		( new Plugin() )->registerAbilities();
+
+		$mediaAbilities = array(
+			'content/find-media',
+			'content/get-media',
+			'content/import-media',
+			'content/update-media',
+			'content/set-featured-image',
+			'content/insert-media',
+		);
+		foreach ( $mediaAbilities as $name ) {
+			self::assertArrayHasKey( $name, WP_Test_Fixtures::$abilities );
+			$definition = WP_Test_Fixtures::$abilities[ $name ];
+			self::assertTrue( $definition['meta']['public'] );
+			self::assertTrue( $definition['meta']['mcp']['public'] );
+			self::assertSame( 'tool', $definition['meta']['mcp']['type'] );
+			self::assertFalse( $definition['input_schema']['additionalProperties'] ?? true );
+		}
+
+		$import = WP_Test_Fixtures::$abilities['content/import-media']['input_schema'];
+		self::assertSame( 'uri', $import['properties']['source_url']['format'] );
+		self::assertArrayNotHasKey( 'base64', $import['properties'] );
+		self::assertArrayNotHasKey( 'path', $import['properties'] );
+
+		$insert = WP_Test_Fixtures::$abilities['content/insert-media']['input_schema'];
+		self::assertSame( array( 'append', 'prepend', 'before', 'after', 'replace' ), $insert['properties']['placement']['enum'] );
+		self::assertSame( 10000, $insert['properties']['anchor_text']['maxLength'] );
+		self::assertSame( array( 'thumbnail', 'medium', 'medium_large', 'large', 'full' ), $insert['properties']['size_slug']['enum'] );
+		self::assertSame( array( 'none', 'media', 'attachment' ), $insert['properties']['link_destination']['enum'] );
 	}
 }

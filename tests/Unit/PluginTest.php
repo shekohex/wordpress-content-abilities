@@ -48,6 +48,12 @@ final class PluginTest extends TestCase {
 				'content/get-term',
 				'content/create-term',
 				'content/update-term',
+				'content/find-media',
+				'content/get-media',
+				'content/import-media',
+				'content/update-media',
+				'content/set-featured-image',
+				'content/insert-media',
 			),
 			array_keys( WP_Test_Fixtures::$abilities )
 		);
@@ -82,6 +88,12 @@ final class PluginTest extends TestCase {
 			'content/get-term'    => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
 			'content/create-term' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
 			'content/update-term' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => true ),
+			'content/find-media' => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
+			'content/get-media' => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
+			'content/import-media' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
+			'content/update-media' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => true ),
+			'content/set-featured-image' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => true ),
+			'content/insert-media' => array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
 		);
 
 		foreach ( $expected as $name => $annotations ) {
