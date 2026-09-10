@@ -4,7 +4,7 @@ Tags: abilities, mcp, ai, rest-api, content
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.3
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,9 @@ No. This plugin intentionally ships no delete or trash ability.
 Only when the caller has the `edit_posts` capability and passes `include_drafts: true` to `content/find-posts`.
 
 == Changelog ==
+
+= 1.1.1 =
+* Explicitly expose content abilities through the MCP adapter discovery tools.
 
 = 1.1.0 =
 * Add category and tag list/search/get, create, and update abilities with taxonomy-specific capabilities.

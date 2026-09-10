@@ -59,6 +59,15 @@ final class AbilityIntegrationTest extends TestCase {
 		}
 	}
 
+	public function testRegisteredDefinitionsExplicitlyExposeAbilitiesThroughMcp(): void {
+		( new Plugin() )->registerAbilities();
+
+		foreach ( WP_Test_Fixtures::$abilities as $name => $args ) {
+			self::assertTrue( $args['meta']['mcp']['public'] ?? false, $name );
+			self::assertSame( 'tool', $args['meta']['mcp']['type'] ?? null, $name );
+		}
+	}
+
 	public function testFindPostsAbilityExecutesThroughService(): void {
 		$this->grantEditor();
 		wp_insert_post(

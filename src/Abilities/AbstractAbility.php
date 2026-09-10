@@ -49,6 +49,10 @@ abstract class AbstractAbility {
 			'permission_callback' => array( $this, 'checkPermissions' ),
 			'meta'                => array(
 				'public'      => true,
+				'mcp'         => array(
+					'public' => true,
+					'type'   => 'tool',
+				),
 				'annotations' => array(
 					'readonly'    => $isReadOnly,
 					'destructive' => $destructive,

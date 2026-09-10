@@ -29,7 +29,7 @@ final class Plugin {
 
 	public const CATEGORY_SLUG = 'content';
 
-	public const VERSION = '1.1.0';
+	public const VERSION = '1.1.1';
 
 	/**
 	 * Registers the ability category (wp_abilities_api_categories_init).

@@ -7,7 +7,7 @@
  * @wordpress-plugin
  * Plugin Name: Content Abilities
  * Description: Exposes post, category, and tag abilities through the WordPress Abilities API and the official MCP Adapter.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Requires at least: 6.9
  * Requires PHP: 8.3
  * Author: shekohex
