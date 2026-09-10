@@ -106,14 +106,13 @@ final class FindPostsAbility extends AbstractAbility implements AbilityContract 
 			'properties' => array(
 				'items'    => array(
 					'type'  => 'array',
-					'items' => array( '$ref' => '#/$defs/post' ),
+					'items' => $this->postSchema(),
 				),
 				'total'    => array( 'type' => 'integer' ),
 				'page'     => array( 'type' => 'integer' ),
 				'per_page' => array( 'type' => 'integer' ),
 			),
 			'required'   => array( 'items', 'total', 'page', 'per_page' ),
-			'$defs'      => array( 'post' => $this->postSchema() ),
 		);
 	}
 }

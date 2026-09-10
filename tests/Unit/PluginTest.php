@@ -82,6 +82,17 @@ final class PluginTest extends TestCase {
 		}
 	}
 
+	public function testOutputSchemasAvoidUnsupportedReferences(): void {
+		$this->plugin->registerCategory();
+		$this->plugin->registerAbilities();
+
+		foreach ( WP_Test_Fixtures::$abilities as $name => $args ) {
+			$json = json_encode( $args['output_schema'], JSON_THROW_ON_ERROR );
+			$this->assertStringNotContainsString( '"$ref"', $json, "$name must not use unsupported schema references" );
+			$this->assertStringNotContainsString( '"$defs"', $json, "$name must not use unsupported schema definitions" );
+		}
+	}
+
 	public function testNoDeleteAbilityIsExposed(): void {
 		$this->plugin->registerCategory();
 		$this->plugin->registerAbilities();
