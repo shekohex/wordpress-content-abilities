@@ -1,0 +1,10 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - wordpress-content-abilities.php
+    excludePaths:
+        - tests
+    treatPhpDocTypesAsCertain: false
+    scanFiles:
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
